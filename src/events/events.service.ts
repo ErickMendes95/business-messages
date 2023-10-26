@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -7,23 +7,69 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(eventData: CreateEventDto) {
-    return this.prisma.event.create({ data: eventData });
+  async create(eventData: CreateEventDto) {
+
+    if (!eventData) {
+      throw new HttpException('BadRequest', HttpStatus.BAD_REQUEST);
+    }
+
+    const eventExist = await this.prisma.event.findFirst({
+      where: { title: eventData.title },
+    });
+
+    if (eventExist) {
+      throw new HttpException('Conflict', HttpStatus.CONFLICT);
+    }
+
+    const event = await this.prisma.event.create({ data: eventData });
+
+    return event;
   }
 
-  findAll() {
-    return this.prisma.event.findMany();
+  async findAll() {
+    
+    const events = await this.prisma.event.findMany();
+    
+    if (events.length === 0) {
+      throw new HttpException('NotFound', HttpStatus.NOT_FOUND);
+    }
+    
+    return events;
   }
 
-  findOne(id: number) {
-    return this.prisma.event.findUnique({ where: { id } });
+  async findOne(id: number) {
+    
+    const event = await this.prisma.event.findUnique({ where: { id } });
+
+    if (!event) {
+      throw new HttpException('NotFound', HttpStatus.NOT_FOUND);
+    }
+
+    return event;
   }
 
-  update(id: number, updateEventDto: UpdateEventDto) {
-    return this.prisma.event.update({ data: updateEventDto, where: { id } });
+  async update(id: number, updateEventDto: UpdateEventDto) {
+    
+    const event = await this.prisma.event.findUnique({ where: { id } });
+
+    if (!event) {
+      throw new HttpException('NotFound', HttpStatus.NOT_FOUND);
+    }
+
+    return await this.prisma.event.update({
+      data: updateEventDto,
+      where: { id },
+    });
   }
 
-  remove(id: number) {
-    return this.prisma.event.delete({ where: { id } });
+  async delete(id: number) {
+    
+    const event = await this.prisma.event.findUnique({ where: { id } });
+
+    if (!event) {
+      throw new HttpException('NotFound', HttpStatus.NOT_FOUND);
+    }
+
+    return await this.prisma.event.delete({ where: { id } });
   }
 }
